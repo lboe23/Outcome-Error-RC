@@ -183,8 +183,6 @@ for(iter in 1:NSIM){
 mu <- rep(0,3)
 Sigma1 <- matrix(.3, nrow=3, ncol=3) + diag(3)*.7
 x_z_data <- (mvrnorm(n=N, mu=mu, Sigma=Sigma1))
-  #covm <- matrix(x_z_data)
-#x_z_data <- matrix(rnorm(nbeta * N), ncol = nbeta)
 colnames(x_z_data) <- paste0("cov", 1:nbeta)
 
 x_1<-(x_z_data[,1])
