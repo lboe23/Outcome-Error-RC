@@ -11,7 +11,7 @@ Code files include:
 
 (4) R code that runs simulations to assess the performance of the "truth," or the scenario in which we have no measurement error in the failure time outcome and the exposure: True Data Method.R
 
-(5) A simulated dataset representing hypothetical data with similar features to the Women's Health Intiative (WHI) that will be used to illustrate our method: Simulated_Data_Example.csv
+(5) A simulated dataset representing hypothetical data with similar features to the Women's Health Intiative (WHI) that will be used to illustrate our method: Simulated_Data_Example_Wide_Form.csv
 
 (6) R code that performs a sample data analysis using the simulated data above: Simulated_Data_Sample_Analysis.R. This code illustrates the analysis methods we used in our manuscript to compute hazard ratio (HR) and 95% confidence interval (CI) estimates of a health outcome for a 20% increase in consumption of a nutrient based on (a) the naive method ignoring error in the outcome and covariate, (b) the method corrected for error in the covariate only, and (c) the proposed method. 
 
