@@ -6,9 +6,6 @@ library(MASS)
 library(mixtools)
 library(reshape2)
 
-#Note that the file and directory below will need to be changed in order for another user to get the code to run.
-Rcpp::sourceCpp('U:/Paper 1/Final Code/RcppFunc.cpp')
-
 #Function to Assess Method Performance
 Data_output <- function(dataset,beta_1,beta_2,beta_3){
 
