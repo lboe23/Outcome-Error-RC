@@ -11,4 +11,4 @@ Code files include:
 
 (4) A .R file that runs simulation to assess the performance of the "truth," or the scenario in which we have no measurement error in the failure time outcome and the exposure.
 
-(5) A .Rcpp file that contains Rcpp functions that are used to run the code in files (1) and (2) above.
+Files (1) and (2) use functions "loglikC" and "gradlikC" from the following link https://github.com/XiangdongGu/icensmis/blob/master/src/loglikC.cpp and "dmat" and "getrids" from the following link https://github.com/XiangdongGu/icensmis/blob/master/src/dataproc.cpp. These Rcpp functions were developed by Gu, Ma, and Balasubramanian (2015) for the following paper: "Semiparametric time to event models in the presence of error-prone, self-reported outcomes—With application to the women’s health initiative."
