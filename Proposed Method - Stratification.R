@@ -1,24 +1,34 @@
-library(tables)
 library(truncnorm)
 library(pracma)
 library(tidyr)
 library(MASS)
+library(mixtools)
+library(reshape2)
 
-Data_output_strat <- function(dataset,beta_1,beta_2,beta_3){
+#Get rid of any 1's after first true positive
+after_first_pos <- function(x){
+  npos<-cumsum(x==1)
+  (npos==0) | (npos==1 & x==1)
+}
 
+#Function to Assess Method Performance
+coverCI<-function(betahat,SE,betatrue){
+  UL<-betahat+qnorm(.975)*SE
+  LL<-betahat+qnorm(.025)*SE
+  cover<-ifelse( (UL > betatrue) & (LL < betatrue),1,0)
+  return(cover)
+}
+
+Data_output_all <- function(dataset,beta_1,beta_2,beta_3){
+  dataset<-na.omit(dataset)
   ### avg across simulations
   mean_delta1<-mean(dataset$delta1)
   mean_delta2<-mean(dataset$delta2)
   mean_delta3<-mean(dataset$delta3)
   delta<-rbind(mean_delta1,mean_delta2,mean_delta3)
 
-  mean_strat1<-mean(dataset$strat_1)
-  mean_strat2<-mean(dataset$strat_2)
-  mean_strat3<-mean(dataset$strat_3)
-  mean_strat4<-mean(dataset$strat_4)
-  strat_all<-rbind(mean_strat1,mean_strat2,mean_strat3,mean_strat4)
+  mean_truecensrate<-mean(dataset$truecensrate)
 
-  mean_truecensrate<-mean(dataset$TrueCensRate)
 
   #Average regression coefficients
   mean_beta1<-mean(dataset$beta1)
@@ -33,34 +43,95 @@ Data_output_strat <- function(dataset,beta_1,beta_2,beta_3){
   ESE_beta2<-sd(dataset$beta2)
   ESE_beta3<-sd(dataset$beta3)
 
+  ASE_beta1X<-mean(dataset$se_betaX1)
+  ASE_beta2X<-mean(dataset$se_betaX2)
+  ASE_beta3X<-mean(dataset$se_betaX3)
+  ESE_beta1X<-sd(dataset$betaX1)
+  ESE_beta2X<-sd(dataset$betaX2)
+  ESE_beta3X<-sd(dataset$betaX3)
+
+  ASE_beta1Y<-mean(dataset$se_betaY1)
+  ASE_beta2Y<-mean(dataset$se_betaY2)
+  ASE_beta3Y<-mean(dataset$se_betaY3)
+  ESE_beta1Y<-sd(dataset$betaY1)
+  ESE_beta2Y<-sd(dataset$betaY2)
+  ESE_beta3Y<-sd(dataset$betaY3)
+
+  ASE_beta1T<-mean(sqrt(dataset$se_betaT1))
+  ASE_beta2T<-mean(sqrt(dataset$se_betaT2))
+  ASE_beta3T<-mean(sqrt(dataset$se_betaT3))
+  ESE_beta1T<-sd(dataset$betaT1)
+  ESE_beta2T<-sd(dataset$betaT2)
+  ESE_beta3T<-sd(dataset$betaT3)
+
+  ASE_beta1N<-mean(sqrt(dataset$se_betaN1))
+  ASE_beta2N<-mean(sqrt(dataset$se_betaN2))
+  ASE_beta3N<-mean(sqrt(dataset$se_betaN3))
+  ESE_beta1N<-sd(dataset$betaN1)
+  ESE_beta2N<-sd(dataset$betaN2)
+  ESE_beta3N<-sd(dataset$betaN3)
+
   #Mean percent bias corrected = (estimated-target)/target
   bias_beta1<-(dataset$beta1-beta_1)/beta_1
   bias_beta2<-(dataset$beta2-beta_2)/beta_2
   bias_beta3<-(dataset$beta3-beta_3)/beta_3
 
+  bias_beta1X<-(dataset$betaX1-beta_1)/beta_1
+  bias_beta2X<-(dataset$betaX2-beta_2)/beta_2
+  bias_beta3X<-(dataset$betaX3-beta_3)/beta_3
+
+  bias_beta1Y<-(dataset$betaY1-beta_1)/beta_1
+  bias_beta2Y<-(dataset$betaY2-beta_2)/beta_2
+  bias_beta3Y<-(dataset$betaY3-beta_3)/beta_3
+
+  bias_beta1N<-(dataset$betaN1-beta_1)/beta_1
+  bias_beta2N<-(dataset$betaN2-beta_2)/beta_2
+  bias_beta3N<-(dataset$betaN3-beta_3)/beta_3
+
+  bias_beta1T<-(dataset$betaT1-beta_1)/beta_1
+  bias_beta2T<-(dataset$betaT2-beta_2)/beta_2
+  bias_beta3T<-(dataset$betaT3-beta_3)/beta_3
+
   mean_bias_beta1<-mean(bias_beta1)*100
   mean_bias_beta2<-mean(bias_beta2)*100
   mean_bias_beta3<-mean(bias_beta3)*100
 
+  mean_bias_beta1X<-mean(bias_beta1X)*100
+  mean_bias_beta2X<-mean(bias_beta2X)*100
+  mean_bias_beta3X<-mean(bias_beta3X)*100
+
+  mean_bias_beta1Y<-mean(bias_beta1Y)*100
+  mean_bias_beta2Y<-mean(bias_beta2Y)*100
+  mean_bias_beta3Y<-mean(bias_beta3Y)*100
+
+  mean_bias_beta1N<-mean(bias_beta1N)*100
+  mean_bias_beta2N<-mean(bias_beta2N)*100
+  mean_bias_beta3N<-mean(bias_beta3N)*100
+
+  mean_bias_beta1T<-mean(bias_beta1T)*100
+  mean_bias_beta2T<-mean(bias_beta2T)*100
+  mean_bias_beta3T<-mean(bias_beta3T)*100
+
   #Coverage Probability Calculation
-  beta_1_l95<-dataset$beta1-qnorm(0.975)*(dataset$se_beta1)
-  beta_1_r95<-dataset$beta1+qnorm(0.975)*(dataset$se_beta1)
+  CP1<-mean(coverCI(dataset$beta1,dataset$se_beta1,beta_1),na.rm=TRUE)
+  CP2<-mean(coverCI(dataset$beta2,dataset$se_beta2,beta_2),na.rm=TRUE)
+  CP3<-mean(coverCI(dataset$beta3,dataset$se_beta3,beta_3),na.rm=TRUE)
 
-  beta_2_l95<-dataset$beta2-qnorm(0.975)*(dataset$se_beta2)
-  beta_2_r95<-dataset$beta2+qnorm(0.975)*(dataset$se_beta2)
+  CP1Y<-mean(coverCI(dataset$betaY1,dataset$se_betaY1,beta_1),na.rm=TRUE)
+  CP2Y<-mean(coverCI(dataset$betaY2,dataset$se_betaY2,beta_2),na.rm=TRUE)
+  CP3Y<-mean(coverCI(dataset$betaY3,dataset$se_betaY3,beta_3),na.rm=TRUE)
 
-  beta_3_l95<-dataset$beta3-qnorm(0.975)*(dataset$se_beta3)
-  beta_3_r95<-dataset$beta3+qnorm(0.975)*(dataset$se_beta3)
+  CP1X<-mean(coverCI(dataset$betaX1,dataset$se_betaX1,beta_1),na.rm=TRUE)
+  CP2X<-mean(coverCI(dataset$betaX2,dataset$se_betaX2,beta_2),na.rm=TRUE)
+  CP3X<-mean(coverCI(dataset$betaX3,dataset$se_betaX3,beta_3),na.rm=TRUE)
 
-  beta_1_ci<-as.data.frame(cbind(beta_1_l95,beta_1_r95))
-  beta_2_ci<-as.data.frame(cbind(beta_2_l95,beta_2_r95))
-  beta_3_ci<-as.data.frame(cbind(beta_3_l95,beta_3_r95))
+  CP1T<-mean(coverCI(dataset$betaT1,sqrt(dataset$se_betaT1),beta_1),na.rm=TRUE)
+  CP2T<-mean(coverCI(dataset$betaT2,sqrt(dataset$se_betaT2),beta_2),na.rm=TRUE)
+  CP3T<-mean(coverCI(dataset$betaT3,sqrt(dataset$se_betaT3),beta_3),na.rm=TRUE)
 
-  # check the proportion of intervals containing the parameter
-  CP1<-mean(apply(beta_1_ci, 1, findInterval, x = beta_1) == 1)
-  CP2<-mean(apply(beta_2_ci, 1, findInterval, x = beta_2) == 1)
-  CP3<-mean(apply(beta_3_ci, 1, findInterval, x = beta_3) == 1)
-  Coverage<-cbind(CP1,CP2,CP3)
+  CP1N<-mean(coverCI(dataset$betaN1,sqrt(dataset$se_betaN1),beta_1),na.rm=TRUE)
+  CP2N<-mean(coverCI(dataset$betaN2,sqrt(dataset$se_betaN2),beta_2),na.rm=TRUE)
+  CP3N<-mean(coverCI(dataset$betaN3,sqrt(dataset$se_betaN3),beta_3),na.rm=TRUE)
 
   beta1_results<-cbind(mean_bias_beta1,ASE_beta1,ESE_beta1,CP1)
   beta2_results<-cbind(mean_bias_beta2,ASE_beta2,ESE_beta2,CP2)
@@ -69,17 +140,47 @@ Data_output_strat <- function(dataset,beta_1,beta_2,beta_3){
   results<-round(results,4)
   colnames(results) <- (c("Bias","ASE","ESE","Coverage"))
 
-  return(list(results,delta,mean_truecensrate,strat_all))
+  beta1_resultsX<-cbind(mean_bias_beta1X,ASE_beta1X,ESE_beta1X,CP1X)
+  beta2_resultsX<-cbind(mean_bias_beta2X,ASE_beta2X,ESE_beta2X,CP2X)
+  beta3_resultsX<-cbind(mean_bias_beta3X,ASE_beta3X,ESE_beta3X,CP3X)
+  resultsX<-rbind(beta1_resultsX,beta2_resultsX,beta3_resultsX)
+  resultsX<-round(resultsX,4)
+  colnames(resultsX) <- (c("Bias","ASE","ESE","Coverage"))
+
+  beta1_resultsY<-cbind(mean_bias_beta1Y,ASE_beta1Y,ESE_beta1Y,CP1Y)
+  beta2_resultsY<-cbind(mean_bias_beta2Y,ASE_beta2Y,ESE_beta2Y,CP2Y)
+  beta3_resultsY<-cbind(mean_bias_beta3Y,ASE_beta3Y,ESE_beta3Y,CP3Y)
+  resultsY<-rbind(beta1_resultsY,beta2_resultsY,beta3_resultsY)
+  resultsY<-round(resultsY,4)
+  colnames(resultsY) <- (c("Bias","ASE","ESE","Coverage"))
+
+  beta1_resultsN<-cbind(mean_bias_beta1N,ASE_beta1N,ESE_beta1N,CP1N)
+  beta2_resultsN<-cbind(mean_bias_beta2N,ASE_beta2N,ESE_beta2N,CP2N)
+  beta3_resultsN<-cbind(mean_bias_beta3N,ASE_beta3N,ESE_beta3N,CP3N)
+  resultsN<-rbind(beta1_resultsN,beta2_resultsN,beta3_resultsN)
+  resultsN<-round(resultsN,4)
+  colnames(resultsN) <- (c("Bias","ASE","ESE","Coverage"))
+
+  beta1_resultsT<-cbind(mean_bias_beta1T,ASE_beta1T,ESE_beta1T,CP1T)
+  beta2_resultsT<-cbind(mean_bias_beta2T,ASE_beta2T,ESE_beta2T,CP2T)
+  beta3_resultsT<-cbind(mean_bias_beta3T,ASE_beta3T,ESE_beta3T,CP3T)
+  resultsT<-rbind(beta1_resultsT,beta2_resultsT,beta3_resultsT)
+  resultsT<-round(resultsT,4)
+  colnames(resultsT) <- (c("Bias","ASE","ESE","Coverage"))
+
+  return(list(Proposed=results,CorrX=resultsX,CorrY=resultsY,True=resultsT,Naive=resultsN,delta=delta,CR=mean_truecensrate))
 }
 
-
+#Functions needed for proposed method variance calculation
 CovAfunc_helper<-function(A,k,CovarLam,j_1,j_2,n_r,i_1,i_2){
   covA_val<-A[i_1,1]*A[1,j_1]*A[i_2,1]*A[1,j_2]*(CovarLam[1,1])+
     A[i_1,1]*A[2,j_1]*A[i_2,1]*A[1,j_2]*(CovarLam[2,1])+
     A[i_1,1]*A[3,j_1]*A[i_2,1]*A[1,j_2]*(CovarLam[3,1])+
+
     A[i_1,1]*A[1,j_1]*A[i_2,1]*A[2,j_2]*(CovarLam[1,2])+
     A[i_1,1]*A[2,j_1]*A[i_2,1]*A[2,j_2]*(CovarLam[2,2])+
     A[i_1,1]*A[3,j_1]*A[i_2,1]*A[2,j_2]*(CovarLam[3,2])+
+
     A[i_1,1]*A[1,j_1]*A[i_2,1]*A[3,j_2]*(CovarLam[1,3])+
     A[i_1,1]*A[2,j_1]*A[i_2,1]*A[3,j_2]*(CovarLam[2,3])+
     A[i_1,1]*A[3,j_1]*A[i_2,1]*A[3,j_2]*(CovarLam[3,3])
@@ -110,20 +211,29 @@ VarB_valid<-function(SigmaBeta,CovarLam,CorrectA,Beta_Star,n_r){
   return(varbeta)
 }
 
+####################################################
+###### Begin Data Generation and Simulation  #######
+####################################################
+
 #test times is vector of pre-scheduled test times
 set.seed(1512)
+#set.seed(823) #Needed for stratification table only when CR=90, deltahat=0.30, Se=90, and Sp=80
 
 N<-1000
+#N<-65000
 nvalid<-500
 
 #Varying Sens/Spec:
-sensitivity<-0.80; specificity<-0.90
-#sensitivity<-0.90; specificity<-0.80
+#sensitivity<-0.61; specificity<-0.995
+#sensitivity<-0.80; specificity<-0.90
+sensitivity<-0.90; specificity<-0.80
 
 #varying Negative Predictive Value (Web Appendix Table A1):
 negpred<-1
 #negpred<-0.90
 #negpred<-0.98
+#negpred<-0.96
+
 ########Event Rate
 
 #want testtimes to be integers for visit times to be clinically meaningful
@@ -131,18 +241,18 @@ negpred<-1
 #Give a baseline hazard rate
 
 #TABLE 1 - 2 settings
-  testtimes<-c(1,3,4,6) #censoring rate 0.55
-  blambda<-0.094 #censoring rate 0.55
+#testtimes<-c(1,3,4,6) #censoring rate 0.55
+#blambda<-0.094 #censoring rate 0.55
 
-  #testtimes<-c(2,5,7,8) #censoring rate 0.90
-  #blambda<-0.012 #censoring rate 0.90
+testtimes<-c(2,5,7,8) #censoring rate 0.90
+blambda<-0.012 #censoring rate 0.90
 
 #Table 2 - 2 settings
-  #testtimes<-c(1,3,4,6) #censoring rate 0.55
-  #blambda<-0.076 #censoring rate 0.55
+#testtimes<-c(1,3,4,6) #censoring rate 0.55
+#blambda<-0.076 #censoring rate 0.55
 
-  #testtimes<-c(2,5,7,8) #censoring rate 0.90
-  #blambda<-0.008 #censoring rate 0.90
+#testtimes<-c(2,5,7,8) #censoring rate 0.90
+#blambda<-0.008 #censoring rate 0.90
 
 #Data is going to be in long form: creates 4 IDs per subject 1-1000
 ntest <- length(testtimes)
@@ -160,19 +270,10 @@ beta_1<-log(1.5)
 beta_2<-log(.7)
 beta_3<-log(1.3)
 betas<-c(beta_1,beta_2,beta_3)
-nbeta=length(betas)
-
-#Initializing values for parameters gamma_1,...,gamma_4 and for the beta that will be used in optim
-beta1_0<-beta2_0<-beta3_0<-0.5
-gamma1_0<-gamma2_0<-gamma3_0<-gamma4_0<-.1
-param0b<-c(beta1_0,beta2_0,beta3_0)
+nbeta<-length(betas)
 
 NSIM<-1000
-
-betamat<-betasdmat<-totalmat<-TrueCensRate<-stat_table<-Etamat<-deltamat<-SDBeta<-VarBeta<-betaHatStar<-Zmat<-Pmat<-NULL
-
-mu <- rep(0,3)
-Sigma1 <- matrix(.3, nrow=3, ncol=3) + diag(3)*.7
+betamat<-betasdmat<-totalmat<-Etamat<-deltamat<-SDBeta<-VarBeta<-betaHatStar<-TrueCensRate<-Pmat<-Zmat<-ErrXMat<-SDBetaX<-VarBetaX<-SDBetaY<-ErrCensRate<-NaiveBetaMat<-NaiveSDMat<-TrueBetaMat<-TrueSDMat<-NULL
 
 for(iter in 1:NSIM){
 
@@ -190,14 +291,14 @@ for(iter in 1:NSIM){
   alphaX<-0.8
   alphaZ1<-0.3
   alphaZ2<-0.5
-  #x_star<-alpha0+alphaX*x_z_data[,1]+ rnorm(N,0,1.31) #delta = 0.3
+
   x_star<-alpha0+alphaX*x_z_data[,1]+alphaZ1*x_z_data[,2]+alphaZ1*x_z_data[,3]+ rnorm(N,0,1.31) #delta = 0.3
   #x_star<-alpha0+alphaX*x_z_data[,1]+alphaZ1*x_z_data[,2]+alphaZ1*x_z_data[,3]+ rnorm(N,0,0.77) #delta = 0.6
 
   x_star_star<-x_z_data[,1]+ rnorm(N,0,.25)
 
   #################################################################
-  #Subset the data - first 200 observations
+  #Subset the data
   valid_subset_data<-as.data.frame(cbind(x_star,x_star_star,z_1,z_2))
   names(valid_subset_data)<-c("x_star_v","x_starstar_v","z_1_v","z_2_v")
   index<-sample(1:nrow(valid_subset_data),nvalid,replace=FALSE)
@@ -226,32 +327,81 @@ for(iter in 1:NSIM){
   ET <- rexp(N, lambda1)
   x_z_data <- x_z_data[ID, , drop = F]
 
-  ET <- ET[ID]
+  ET_true<-ET[ID]
   strat <- strat[ID]
+  ET[rbinom(N, 1, 1 - negpred) == 1] <- 0
+
+  ET <- ET[ID]
   x_star <- x_star[ID]
 
   occur <- time > ET
-  true_result<-as.numeric(occur)
-
-  EventRate<-rbind(EventRate,cbind(mean(true_result)))
-
+  occur_TRUE<- time > ET_true
+  true_result<-as.numeric(occur_TRUE)
+  ####
   probs <- ifelse(occur, sensitivity, 1 - specificity)
   result <- rbinom(length(occur), 1, probs)
 
-  thisdata <- data.frame(ID, x_z_data,x_star,strat, testtime = time, result = result,true_result=true_result)
+  data <- data.frame(ID, x_z_data,x_star,strat, testtime = time, result = result,true_result=true_result)
 
-  data_wide_trueresult <- dcast(thisdata, ID ~ testtime, value.var="true_result")
+  data_wide_trueresult <- dcast(data, ID ~ testtime, value.var="true_result")
   colnames(data_wide_trueresult)<-c("ID","Vis1","Vis2","Vis3","Vis4")
 
+  data_wide_errresult <- dcast(data, ID ~ testtime, value.var="result")
+  colnames(data_wide_errresult)<-c("ID","Vis1","Vis2","Vis3","Vis4")
+
   TrueCensRate<-rbind(TrueCensRate,mean(data_wide_trueresult$Vis4==0))
+  ErrCensRate<-rbind(ErrCensRate,mean(data_wide_errresult$Vis4==0))
+
+  #Fit Model for Error in X Only
+  keep_groupedsurv<-unlist(tapply(data$result,data$ID,after_first_pos))
+  #unlist - unlist a list of vectors into a single vector
+  #tapply applies my "after_first_pos" function to the "result" of data vector
+  datafinal_errX<-data[keep_groupedsurv,]
+
+  #Non Error-Prone x - Correct error in X but not Y
+  datafinal_errX$testtime<-as.factor(datafinal_errX$testtime)
+  fit_errX<-glm(result~testtime+x_star+cov2+cov3+testtime*strat,family=binomial(link="cloglog"),data=datafinal_errX)
+
+  fitsum_errX<-summary(fit_errX)
+  beta_correrrX<-fitsum_errX$coefficients[c("x_star","cov2","cov3"),1]
+  betaSE_correrrX<-vcov(fitsum_errX)[c("x_star","cov2","cov3"),c("x_star","cov2","cov3")]
+
+  corrected_errX_beta<-t(as.matrix(beta_correrrX))%*%solve(eta1)
+  ErrXMat<-rbind(ErrXMat,corrected_errX_beta)
+
+  VarBetaCorrectedX<-VarB_valid(betaSE_correrrX,covla_fin,eta1,beta_correrrX,nvalid)
+  SDBetaX<-rbind(SDBetaX,c(sqrt(VarBetaCorrectedX[1,1]),sqrt(VarBetaCorrectedX[2,2]),sqrt(VarBetaCorrectedX[3,3])))
+  VarBetaX<-rbind(VarBetaX,c(VarBetaCorrectedX[1,1],VarBetaCorrectedX[2,2],VarBetaCorrectedX[3,3]))
+
+  #True Model
+  #Fit Model for Error in X Only
+  keep_groupedsurv_truth<-unlist(tapply(data$true_result,data$ID,after_first_pos))
+  #unlist - unlist a list of vectors into a single vector
+  #tapply applies my "after_first_pos" function to the "result" of data vector
+  datafinal_true<-data[keep_groupedsurv_truth,]
+  datafinal_true$testtime<-as.factor(datafinal_true$testtime)
+
+  fit_truth<-glm(true_result~testtime+cov1+cov2+cov3+testtime*strat,family=binomial(link="cloglog"),data=datafinal_true)
+
+  fitsum__true<-summary(fit_truth)
+  beta_truth<-fitsum__true$coefficients[c("cov1","cov2","cov3"),1]
+  betaSE_truth<-vcov(fitsum__true)[c("cov1","cov2","cov3"),c("cov1","cov2","cov3")]
+
+  NaiveBetaMat<-rbind(NaiveBetaMat,beta_correrrX)
+  NaiveSDMat<-rbind(NaiveSDMat,diag(betaSE_correrrX))
+
+  TrueBetaMat<-rbind(TrueBetaMat,beta_truth)
+  TrueSDMat<-rbind(TrueSDMat,diag(betaSE_truth))
 
 
-  datas1 <- thisdata[which(thisdata$strat=="cat_1"),]
-  datas2 <- thisdata[which(thisdata$strat=="cat_2"),]
-  datas3 <- thisdata[which(thisdata$strat=="cat_3"),]
-  datas4 <- thisdata[which(thisdata$strat=="cat_4"),]
 
-  prop_strat<-prop.table(table(thisdata$strat))
+
+  datas1 <- data[which(data$strat=="cat_1"),]
+  datas2 <- data[which(data$strat=="cat_2"),]
+  datas3 <- data[which(data$strat=="cat_3"),]
+  datas4 <- data[which(data$strat=="cat_4"),]
+
+  prop_strat<-prop.table(table(data$strat))
   stat_table<-rbind(stat_table,prop_strat)
 
 
@@ -273,8 +423,6 @@ for(iter in 1:NSIM){
 
   formula=result~x_star+cov2+cov3
 
-  negpred = 1
-  betai = param0b
   initsurv = 0.1
 
   id1 <- eval(substitute(subject1), datas1, parent.frame())
@@ -393,7 +541,7 @@ for(iter in 1:NSIM){
   uid4<- getrids(id4, nsub4)
   Xmat4 <- Xmat4[uid4, , drop = F]
 
-  parmall <- c(lami1,lami2,lami3,lami4,betai)
+  parmall <- c(lami1,lami2,lami3,lami4,beta_correrrX)
 
   loglikStrat <- function(parmsS,Dm1,Dm2,Dm3,Dm4,Xmat1,Xmat2,Xmat3,Xmat4){
     parmi1<-parmsS[c(1:4,17:19)]
@@ -406,7 +554,6 @@ for(iter in 1:NSIM){
 
   q <- optim(parmall, loglikStrat, lower = c(rep(lowlam1,4), rep(-Inf, nbeta)), Dm1 = Dm1, Dm2 = Dm2, Dm3 = Dm3, Dm4 = Dm4, Xmat1 = Xmat1, Xmat2 = Xmat2, Xmat3 = Xmat3, Xmat4 = Xmat4, method = "L-BFGS-B", hessian = T)
 
-
   loglik <- -q$value
   totJ<-J1+J2+J3+J4
   lam <- q$par[1:totJ]
@@ -416,8 +563,9 @@ for(iter in 1:NSIM){
   rownames(cov) <- colnames(cov) <- beta.nm1
   beta.fit <- q$par[-(1:totJ)]
   beta.sd <- sqrt(diag(cov))
+  SDBetaY<-rbind(SDBetaY,beta.sd)
 
-
+  ###
   betaHatStar<-rbind(betaHatStar,beta.fit)
   corrected_eta_beta<-t(as.matrix(beta.fit))%*%solve(eta1)
   Etamat<-rbind(Etamat,corrected_eta_beta)
@@ -435,18 +583,16 @@ for(iter in 1:NSIM){
 
   betamat<-rbind(betamat,beta.fit)
   betasdmat<-rbind(betasdmat,beta.sd)
+  ###
+  totalmat<-cbind(betaHatStar,Etamat,ErrXMat,SDBetaY,SDBeta,SDBetaX,deltamat,TrueCensRate,Zmat,Pmat,ErrCensRate,NaiveBetaMat,NaiveSDMat,TrueBetaMat,TrueSDMat)
 
-  totalmat<-cbind(betaHatStar,Etamat,SDBeta,deltamat,TrueCensRate,Zmat,Pmat,stat_table)
-
+  print(iter)
 
 }
 
 totalmat<-data.frame(totalmat)
 
-names(totalmat)<-c("betastar1","betastar2","betastar3","beta1","beta2","beta3","se_beta1","se_beta2","se_beta3","delta1","delta2","delta3","TrueCensRate","z_beta1","z_beta2","z_beta3","p_beta1","p_beta2","p_beta3","strat_1","strat_2","strat_3","strat_4")
-
-beta_1<-log(1.5)
-beta_2<-log(.7)
-beta_3<-log(1.3)
-output_strat<-Data_output_strat(totalmat,beta_1,beta_2,beta_3)
-output_strat
+names(totalmat)<-c("betaY1","betaY2","betaY3","beta1","beta2","beta3","betaX1","betaX2","betaX3","se_betaY1","se_betaY2","se_betaY3","se_beta1","se_beta2","se_beta3","se_betaX1","se_betaX2","se_betaX3",
+                   "delta1","delta2","delta3","truecensrate","z_beta1","z_beta2","z_beta3","p_beta1","p_beta2","p_beta3","errcensrate",
+                   "betaN1","betaN2","betaN3","se_betaN1","se_betaN2","se_betaN3","betaT1","betaT2","betaT3","se_betaT1","se_betaT2","se_betaT3")
+Data_output_all(totalmat,beta_1,beta_2,beta_3)
