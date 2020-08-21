@@ -217,7 +217,6 @@ VarB_valid<-function(SigmaBeta,CovarLam,CorrectA,Beta_Star,n_r){
 
 #test times is vector of pre-scheduled test times
 set.seed(1512)
-#set.seed(823) #Needed for stratification table only when CR=90, deltahat=0.30, Se=90, and Sp=80
 
 N<-1000
 #N<-65000
@@ -225,8 +224,8 @@ nvalid<-500
 
 #Varying Sens/Spec:
 #sensitivity<-0.61; specificity<-0.995
-#sensitivity<-0.80; specificity<-0.90
-sensitivity<-0.90; specificity<-0.80
+sensitivity<-0.80; specificity<-0.90
+#sensitivity<-0.90; specificity<-0.80
 
 #varying Negative Predictive Value (Web Appendix Table A1):
 negpred<-1
@@ -243,9 +242,17 @@ negpred<-1
 #TABLE 1 - 2 settings
 #testtimes<-c(1,3,4,6) #censoring rate 0.55
 #blambda<-0.094 #censoring rate 0.55
+#blambda_s1<-0.090
+#blambda_s2<-0.080
+#blambda_s3<-0.075
+#blambda_s4<-0.131
 
 testtimes<-c(2,5,7,8) #censoring rate 0.90
-blambda<-0.012 #censoring rate 0.90
+#blambda<-0.012 #censoring rate 0.90
+blambda_s1<-0.008
+blambda_s2<-0.010
+blambda_s3<-0.011
+blambda_s4<-0.019
 
 #Table 2 - 2 settings
 #testtimes<-c(1,3,4,6) #censoring rate 0.55
@@ -273,13 +280,27 @@ betas<-c(beta_1,beta_2,beta_3)
 nbeta<-length(betas)
 
 NSIM<-1000
-betamat<-betasdmat<-totalmat<-Etamat<-deltamat<-SDBeta<-VarBeta<-betaHatStar<-TrueCensRate<-Pmat<-Zmat<-ErrXMat<-SDBetaX<-VarBetaX<-SDBetaY<-ErrCensRate<-NaiveBetaMat<-NaiveSDMat<-TrueBetaMat<-TrueSDMat<-NULL
+mu <- rep(0,3)
+Sigma1 <- matrix(.3, nrow=3, ncol=3) + diag(3)*.7
+
+betamat<-betasdmat<-totalmat<-Etamat<-deltamat<-SDBeta<-VarBeta<-betaHatStar<-TrueCensRate<-Pmat<-Zmat<-ErrXMat<-SDBetaX<-VarBetaX<-SDBetaY<-ErrCensRate<-NaiveBetaMat<-NaiveSDMat<-TrueBetaMat<-TrueSDMat<-stat_table<-NULL
 
 for(iter in 1:NSIM){
 
   x_z_data <- (mvrnorm(n=N, mu=mu, Sigma=Sigma1))
   strat <- sample(c('cat_1', 'cat_2','cat_3','cat_4'), N, replace=TRUE)
   colnames(x_z_data) <- paste0("cov", 1:nbeta)
+
+  strat_data_all<-data.frame(x_z_data,strat)
+  datas1_v1 <- strat_data_all[which(strat_data_all$strat=="cat_1"),]
+  datas2_v1 <- strat_data_all[which(strat_data_all$strat=="cat_2"),]
+  datas3_v1 <- strat_data_all[which(strat_data_all$strat=="cat_3"),]
+  datas4_v1 <- strat_data_all[which(strat_data_all$strat=="cat_4"),]
+
+  n_s1<-sum(strat == "cat_1")
+  n_s2<-sum(strat == "cat_2")
+  n_s3<-sum(strat == "cat_3")
+  n_s4<-sum(strat == "cat_4")
 
   x_1<-(x_z_data[,1])
   z_1<-(x_z_data[,2])
@@ -323,12 +344,27 @@ for(iter in 1:NSIM){
 
   #################################################################
 
-  lambda1 <- blambda * exp(c(x_z_data %*% betas))
-  ET <- rexp(N, lambda1)
-  x_z_data <- x_z_data[ID, , drop = F]
+  lambda1 <- blambda_s1 * exp((as.matrix(datas1_v1[,c(1:3)]) %*% betas))
+  lambda2 <- blambda_s2 * exp((as.matrix(datas2_v1[,c(1:3)]) %*% betas))
+  lambda3 <- blambda_s3 * exp((as.matrix(datas3_v1[,c(1:3)]) %*% betas))
+  lambda4 <- blambda_s4 * exp((as.matrix(datas4_v1[,c(1:3)]) %*% betas))
+
+  ET_s1 <- rexp(n_s1, lambda1)
+  ET_s2 <- rexp(n_s2, lambda2)
+  ET_s3 <- rexp(n_s3, lambda3)
+  ET_s4 <- rexp(n_s4, lambda4)
+
+  ET<-c(ET_s1,ET_s2,ET_s3,ET_s4)
+  x_z_data2<-rbind(datas1_v1,datas2_v1,datas3_v1,datas4_v1)
+
+  IDnames <- rownames(x_z_data2)
+  x_z_data2$ID<-as.numeric(IDnames)
+
+
+  x_z_data <- x_z_data2[ID, , drop = F]
 
   ET_true<-ET[ID]
-  strat <- strat[ID]
+  #strat <- strat[ID]
   ET[rbinom(N, 1, 1 - negpred) == 1] <- 0
 
   ET <- ET[ID]
@@ -341,7 +377,10 @@ for(iter in 1:NSIM){
   probs <- ifelse(occur, sensitivity, 1 - specificity)
   result <- rbinom(length(occur), 1, probs)
 
-  data <- data.frame(ID, x_z_data,x_star,strat, testtime = time, result = result,true_result=true_result)
+  data_results <- data.frame(x_z_data, result = result,true_result=true_result)
+
+  data_results_sort <- data_results[order(data_results$ID),]
+  data<-data.frame(data_results_sort,x_star,testtime=time)
 
   data_wide_trueresult <- dcast(data, ID ~ testtime, value.var="true_result")
   colnames(data_wide_trueresult)<-c("ID","Vis1","Vis2","Vis3","Vis4")
@@ -449,25 +488,25 @@ for(iter in 1:NSIM){
     id1 <- id1[ord1]
     time1 <- time1[ord1]
     result1 <- result1[ord1]
-    data1 <- data1[ord1, ]}
+    datas1 <- datas1[ord1, ]}
 
   if (is.unsorted(ord2)) {
     id2 <- id2[ord2]
     time2 <- time2[ord2]
     result2 <- result2[ord2]
-    data2 <- data2[ord2, ]}
+    datas2 <- datas2[ord2, ]}
 
   if (is.unsorted(ord3)) {
     id3 <- id3[ord3]
     time3 <- time3[ord3]
     result3 <- result3[ord3]
-    data3 <- data3[ord3, ]}
+    datas3 <- datas3[ord3, ]}
 
   if (is.unsorted(ord4)) {
     id4 <- id4[ord4]
     time4 <- time4[ord4]
     result4 <- result4[ord4]
-    data4 <- data4[ord4, ]}
+    datas4 <- datas4[ord4, ]}
 
   utime1 <- sort(unique(time1))
   utime2 <- sort(unique(time2))
@@ -596,3 +635,4 @@ names(totalmat)<-c("betaY1","betaY2","betaY3","beta1","beta2","beta3","betaX1","
                    "delta1","delta2","delta3","truecensrate","z_beta1","z_beta2","z_beta3","p_beta1","p_beta2","p_beta3","errcensrate",
                    "betaN1","betaN2","betaN3","se_betaN1","se_betaN2","se_betaN3","betaT1","betaT2","betaT3","se_betaT1","se_betaT2","se_betaT3")
 Data_output_all(totalmat,beta_1,beta_2,beta_3)
+
