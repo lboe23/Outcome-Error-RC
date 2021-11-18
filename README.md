@@ -1,5 +1,5 @@
 # Outcome-Error-RC
-Code for simulation studies in paper, "An approximate quasi-likelihood approach for error-prone failure time outcomes and exposures" by Boe et al.
+Code for simulation studies in paper, "An approximate quasi-likelihood approach for error-prone failure time outcomes and exposures" (Boe et al. 2021, https://doi.org/10.1002/sim.9108) 
 
 Code files include:
 
